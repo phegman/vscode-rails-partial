@@ -7,15 +7,18 @@ import {
   LocationLink,
   Position,
   Uri,
-  workspace
+  workspace,
 } from "vscode";
 
 export default class PartialDefinitionProvider implements DefinitionProvider {
   constructor(private rootPath: string) {}
 
   public async provideDefinition(document: TextDocument, position: Position) {
+    const renderMethods: string[] =
+      workspace.getConfiguration("railsPartial").renderMethods;
+
     const line = document.lineAt(position.line).text;
-    if (!line.includes("render")) {
+    if (renderMethods.every((method) => !line.includes(method))) {
       return null;
     }
 
@@ -33,9 +36,17 @@ export default class PartialDefinitionProvider implements DefinitionProvider {
   }
 
   private partialName(line: string) {
+    const renderMethods: string[] =
+      workspace.getConfiguration("railsPartial").renderMethods;
+    const renderMethodsNonCapturingGroup = `(?:${renderMethods.join("|")})`;
+
     const regex = line.includes("partial")
-      ? /render\s*\(?\s*\:?partial(?:\s*=>|:*)\s*["'](.+?)["']/
-      : /render\s*\(?\s*["'](.+?)["']/;
+      ? new RegExp(
+          `${renderMethodsNonCapturingGroup}\\s*\\(?\s*\\:?partial(?:\\s*=>|:*)\\s*["'](.+?)["']`
+        )
+      : new RegExp(
+          `${renderMethodsNonCapturingGroup}\\s*\\(?\\s*["'](.+?)["']`
+        );
     const result = line.match(regex);
     return result ? result[1] : null;
   }
@@ -45,39 +56,51 @@ export default class PartialDefinitionProvider implements DefinitionProvider {
     partialName: string,
     originSelectionRange: Range
   ): LocationLink[] | null {
-    const viewFileExtensions: string[] = workspace.getConfiguration(
-      "railsPartial"
-    ).viewFileExtensions;
+    const viewFileExtensions: string[] =
+      workspace.getConfiguration("railsPartial").viewFileExtensions;
+    const viewFilePaths: string[] =
+      workspace.getConfiguration("railsPartial").viewFilePaths;
 
-    const fileBase = partialName.includes("/")
-      ? path.join(
-          this.rootPath,
-          "app",
-          "views",
-          path.dirname(partialName),
-          `_${path.basename(partialName)}`
-        )
-      : path.join(path.dirname(currentFileName), `_${partialName}`);
+    const basePaths = partialName.includes("/")
+      ? viewFilePaths.map((viewFilePath) => {
+          const viewFilePathAsArray = viewFilePath.split("/");
 
-    const targetExt = viewFileExtensions.find(ext => {
-      try {
-        fs.accessSync(`${fileBase}.${ext}`, fs.constants.R_OK);
-        return true;
-      } catch (error) {
-        return false;
+          return path.join(
+            this.rootPath,
+            ...viewFilePathAsArray,
+            path.dirname(partialName),
+            `_${path.basename(partialName)}`
+          );
+        })
+      : [path.join(path.dirname(currentFileName), `_${partialName}`)];
+
+    const targetViewFilePath = basePaths.reduce((accumulator, basePath) => {
+      const extension = viewFileExtensions.find((extension) => {
+        try {
+          fs.accessSync(`${basePath}.${extension}`, fs.constants.R_OK);
+          return true;
+        } catch (error) {
+          return false;
+        }
+      });
+
+      if (!extension) {
+        return accumulator;
       }
-    });
 
-    if (!targetExt) {
+      return `${basePath}.${extension}`;
+    }, "");
+
+    if (targetViewFilePath === "") {
       return null;
     }
 
     return [
       {
         originSelectionRange,
-        targetUri: Uri.file(`${fileBase}.${targetExt}`),
-        targetRange: new Range(new Position(0, 0), new Position(0, 0))
-      }
+        targetUri: Uri.file(targetViewFilePath),
+        targetRange: new Range(new Position(0, 0), new Position(0, 0)),
+      },
     ];
   }
 }

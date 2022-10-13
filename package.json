@@ -41,6 +41,26 @@
             "html.erb"
           ],
           "description": "This is the extension of the view files."
+        },
+        "railsPartial.renderMethods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "render"
+          ],
+          "description": "The methods used to render partials"
+        },
+        "railsPartial.viewFilePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "app/views"
+          ],
+          "description": "The paths where partials are located"
         }
       }
     }

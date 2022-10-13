@@ -1,3 +1,13 @@
+This is a fork that adds support for two new settings:
+
+`railsPartial.renderMethods` - The render methods that this plugin detects. Useful for custom render methods.
+`railsPartial.viewFilePaths` - The paths where the partials are. Helpful if they are in multiple directories.
+
+### How to install this fork?
+
+1. Clone this repository
+2. Make sure this repository is your working directory and run `code --install-extension rails-partial-0.3.4.vsix`
+
 # Rails Partial
 
 Definition, Completion and CodeAction provider for Rails Partial.
